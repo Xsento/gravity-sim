@@ -24,6 +24,7 @@ public:
     float posX = 0.0f; 
     float posY = 0.0f;
 
+
     Circle(glm::vec3 color, Shader& shaderProgram){
         //set up vertex array   
         float angle;
@@ -75,22 +76,6 @@ public:
     }
 };
 
-// Vertices coordinates
-GLfloat vertices[] =
-{//     COORDINATES             COLORS     
-    -0.5f, -0.5f, 0.0f,   1.0f, 0.0f, 0.0f,// Lower left corner
-    -0.5f, 0.5f, 0.0f,    0.0f, 0.0f, 1.0f,// Upper left corner
-    0.5f, 0.5f, 0.0f,     1.0f, 1.0f, 1.0f,// Upper right corner
-    0.5f, -0.5f, 0.0f,    0.0f, 1.0f, 0.0f// Lower right corner
-};
-
-// Indices for vertices order
-GLuint indices[] =
-{
-    0, 2, 1, 
-    0, 3, 2
-};
-
 int main(){
 
     glfwInit();
@@ -126,33 +111,13 @@ int main(){
     //make a shader program using the shader files
     Shader shaderProgram("shaders/default.vert","shaders/default.frag");    
 
-    //make and bind vao
-    VAO VAO1;
-    VAO1.Bind();
-
-    //make vbo and ebo and link them to vertices
-    VBO VBO1;
-    VBO1.AssignValue(vertices, sizeof(vertices));
-    EBO EBO1(indices, sizeof(indices));
-
-    //link vbo attriutes like coords and color to the vao
-    //the n in n*sizeof(float) represents the amount of parameters within the vertex
-    VAO1.LinkAttrib(VBO1, 0, 3, GL_FLOAT, 6*sizeof(float), (void*)0);
-    VAO1.LinkAttrib(VBO1, 1, 3, GL_FLOAT, 6*sizeof(float), (void*)(3*sizeof(float)));
-    
-    //take a wild fucking guess
-    VAO1.Unbind();
-    VBO1.Unbind();  
-    EBO1.Unbind();
-
     glm::vec3 red = glm::vec3(1.0f,0.0f,0.0f);
     glm::vec3 green = glm::vec3(0.0f,1.0f,0.0f);
-    Circle Circle1(red,shaderProgram);
-    Circle Circle2(green,shaderProgram);
+    Circle Circles[2] = {Circle(red,shaderProgram), Circle(green,shaderProgram)};
 
     glm::vec3 vect(0.5f,0.0f,0.0f);
-    Circle1.Translate(vect);
-    Circle2.Translate(-vect);
+    Circles[0].Translate(vect);
+    Circles[1].Translate(-vect);
 
     //main loop (while the window is active)
     while(!glfwWindowShouldClose(window)){
@@ -168,19 +133,20 @@ int main(){
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         VAO1.Unbind();*/
 
-        Circle1.Draw(shaderProgram);
-        Circle2.Draw(shaderProgram);
-
+        for (int i=0; i<2; i++){
+            Circles[i].Draw(shaderProgram);
+        }
+        
         //swap buffers (apply changes)
         glfwSwapBuffers(window);
         glfwPollEvents(); // function that processes events (like resizing and moving the window)
     }
 
     //delete all created objects to keep it clean
-    VAO1.Delete();
-    VBO1.Delete();
-    EBO1.Delete();
-    Circle1.Delete();
+
+    for (int i=0; i<2; i++){
+        Circles[i].Delete();
+    }
     shaderProgram.Delete();
 
     glfwDestroyWindow(window);
