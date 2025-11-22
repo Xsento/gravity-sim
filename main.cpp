@@ -12,29 +12,38 @@
 #include "VAO.h"
 #include "EBO.h"
 
+GLsizei windowWidth = 800;
+GLsizei windowHeight = 800; 
+
+
 class Circle{
 private:
-    const static int precision = 100; //amount of triangles, more equals more circle looking shape
+    const static int precision = 20; //amount of triangles, more equals more circle looking shape
     VAO vao;
     VBO vbo; // its lowercase for readability (the class has the same name)
     glm::mat4 trans = glm::mat4(1.0f); //transformation matrix set to be an identity matrix (i.e. does nothing)
     GLfloat circleVertices[precision*6];
 
 public:
-    float posX = 0.0f; 
-    float posY = 0.0f;
+    //physics variables
+    glm::vec2 position = glm::vec2(500.0f,500.0f);
+    glm::vec2 acceleration = glm::vec2(0.0f,0.0f);
+    glm::vec2 velocity = glm::vec2(0.0f,0.0f);
+    glm::vec2 gravForce = glm::vec2(0.0f,0.0f);
+    glm::vec2 gravAcceleration = glm::vec2(0.0f,0.0f);
+    float mass = 1e12f;
 
 
     Circle(glm::vec3 color, Shader& shaderProgram){
         //set up vertex array   
         float angle;
-        float radius = 0.2f;
+        float radius = 0.02f;
 
         //the vertices' positions are calculated using sin and cos
         for (int i=0; i<precision; i++){
             angle=(2*M_PI*i)/precision;
-            circleVertices[i*6] = radius*cos(angle) + posX; 
-            circleVertices[i*6+1] = radius*sin(angle) + posY;
+            circleVertices[i*6] = radius*cos(angle); 
+            circleVertices[i*6+1] = radius*sin(angle);
             circleVertices[i*6+2] = 1.0f;
             circleVertices[i*6+3] = color.x;
             circleVertices[i*6+4] = color.y;
@@ -48,7 +57,6 @@ public:
         vao.LinkAttrib(vbo, 1, 3, GL_FLOAT, 6*sizeof(float), (void*)(3*sizeof(float))); //color
 
         //put the identity matrix into the uniform so the ball actually renders
-        shaderProgram.Activate();
         unsigned int transformLoc = glGetUniformLocation(shaderProgram.ID, "transform");
         glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(trans));
 
@@ -57,7 +65,6 @@ public:
     }
 
     void Draw(Shader& shaderProgram){
-        shaderProgram.Activate();
         unsigned int transformLoc = glGetUniformLocation(shaderProgram.ID, "transform");
         glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(trans));
 
@@ -73,17 +80,39 @@ public:
 
     void Translate(glm::vec3 transVect){
         trans = glm::translate(trans, transVect); 
+        position = glm::vec2(position.x+transVect.x,position.y+transVect.y); 
+    }
+
+    void SetPosition(glm::vec2 newPosition){
+        trans = glm::mat4(1.0f);    //reset the translation matrix
+        //convert pixel coords to the ones between -1 and 1
+        trans = glm::translate(trans,glm::vec3((newPosition.x-windowWidth/2)/(windowWidth/2),(newPosition.y-windowHeight/2)/(windowHeight/2),0.0f));
+        position = newPosition;
+    }
+
+    void Update(float time){
+        gravAcceleration= gravForce/mass;
+        velocity += (acceleration+gravAcceleration)*time;
+        SetPosition(position+velocity*time);
     }
 };
 
+const float G = 6.67430151515e-11;
+void Gravity(Circle& circle1, Circle& circle2){
+    glm::vec2 r21 = circle2.position - circle1.position;
+    glm::vec2 unit_r21 = r21 / glm::length(r21);
+    glm::vec2 F21 = (-G * circle1.mass * circle2.mass * unit_r21)/glm::length(r21*r21);
+
+    //std::cout << r21.x << " " << r21.y << std::endl;
+    //std::cout << unit_r21.x << unit_r21.y << std::endl;
+    //std::cout << "Force applied to circle 2: [" << F21.x << "," << F21.y << "]" << std::endl;
+
+    circle2.gravForce = F21;
+    circle1.gravForce = -F21;
+}
+
+
 int main(){
-
-    glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-
     //initialization
     glfwInit();
 
@@ -94,7 +123,7 @@ int main(){
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     //create window with parameters width, height, name, fullscreen, some bullshit
-    GLFWwindow* window =glfwCreateWindow(800,800,"Lorem Ipsum",NULL,NULL);
+    GLFWwindow* window =glfwCreateWindow(windowWidth,windowHeight,"Lorem Ipsum",NULL,NULL);
     //error checking
     if (window == NULL){
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -104,21 +133,26 @@ int main(){
     //introduce the window to the current context (make it active)
     glfwMakeContextCurrent(window);
 
-    gladLoadGL(); //load GLAD so it configures
+    gladLoadGL(); //load OpenGL
 
-    glViewport(0,0,800,800); //tells opengl the area of the window to render in
+    glViewport(0,0,windowWidth,windowHeight); //tells opengl the area of the window to render in
 
     //make a shader program using the shader files
-    Shader shaderProgram("shaders/default.vert","shaders/default.frag");    
+    Shader shaderProgram("shaders/default.vert","shaders/default.frag"); 
+    shaderProgram.Activate();   
 
     glm::vec3 red = glm::vec3(1.0f,0.0f,0.0f);
     glm::vec3 green = glm::vec3(0.0f,1.0f,0.0f);
     Circle Circles[2] = {Circle(red,shaderProgram), Circle(green,shaderProgram)};
 
-    glm::vec3 vect(0.5f,0.0f,0.0f);
-    Circles[0].Translate(vect);
-    Circles[1].Translate(-vect);
 
+    Circles[0].SetPosition(glm::vec2(200,600.0f));
+    Circles[0].velocity.y = -2.0f;
+    Circles[1].SetPosition(glm::vec2(500,500.0f));
+    Circles[1].mass *= 100.0f;
+
+    //Circles[0].acceleration = glm::vec2(1.0f,-1.0f);
+    float stime = 0;
     //main loop (while the window is active)
     while(!glfwWindowShouldClose(window)){
         //set bg color
@@ -127,15 +161,15 @@ int main(){
         //activate the shader!
         shaderProgram.Activate();
 
-        /*//bind the VAO so opengl knows to use it
-        VAO1.Bind();
-        //draw
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-        VAO1.Unbind();*/
+        stime = glfwGetTime() / 10;
 
+        Gravity(Circles[0],Circles[1]);
+    
         for (int i=0; i<2; i++){
+            Circles[i].Update(stime);
             Circles[i].Draw(shaderProgram);
         }
+
         
         //swap buffers (apply changes)
         glfwSwapBuffers(window);
