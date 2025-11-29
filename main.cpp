@@ -12,16 +12,22 @@
 #include "VAO.h"
 #include "EBO.h"
 
+//window parameters
 GLsizei windowWidth = 800;
 GLsizei windowHeight = 800; 
 
-//define physics constants and units
+//physics constants and units [M☉, AU, yr]
 const double solarMass = 1;
 const double earthMass = 0.000003003 * solarMass;
-const double pixelsPerAU = 100; // 1 pixel = x meters
-const double uMass = solarMass; // unit of mass  
+double pixelsPerAU = 10; //modifiable for zoom purposes
 const double G = 4*M_PI*M_PI ; // gravitational constant
 const double SecondsPerYear = 31556926;
+double speed = 3600*24*30;
+
+//camera variables
+glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 0.0f);
+glm::vec3 cameraUp  = glm::vec3(0.0f, 1.0f, 0.0f);
+//glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
 
 class Circle{
 private:
@@ -66,16 +72,16 @@ public:
         vao.LinkAttrib(vbo, 1, 3, GL_FLOAT, 6*sizeof(float), (void*)(3*sizeof(float))); //color
 
         //put the identity matrix into the uniform so the ball actually renders
-        unsigned int transformLoc = glGetUniformLocation(shaderProgram.ID, "transform");
-        glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(trans));
+        unsigned int viewLoc = glGetUniformLocation(shaderProgram.ID, "view");
+        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(trans));
 
         vao.Unbind();
         vbo.Unbind();
     }
 
     void Draw(Shader& shaderProgram){
-        unsigned int transformLoc = glGetUniformLocation(shaderProgram.ID, "transform");
-        glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(trans));
+        unsigned int viewLoc = glGetUniformLocation(shaderProgram.ID, "view");
+        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(trans));
 
         vao.Bind();
         glDrawArrays(GL_TRIANGLE_FAN, 0, precision);
@@ -106,6 +112,7 @@ public:
         trans = glm::mat4(1.0f);    //reset the translation matrix
         //convert pixel coords to the ones between -1 and 1
         trans = glm::translate(trans,glm::vec3((positionPixel.x-windowWidth/2)/(windowWidth/2),(positionPixel.y-windowHeight/2)/(windowHeight/2),0.0f));
+        trans = glm::translate(trans,cameraPos);
 
         //update size based on mass
         //size = sqrt(mass);
@@ -113,24 +120,10 @@ public:
     }
 };
 
-void Gravity(Circle& circle1, Circle& circle2, double time){
-    glm::vec<2, double> r = circle2.positionReal - circle1.positionReal;
-    glm::vec<2, double> unit_r = r / glm::length(r);
-    glm::vec<2, double> F21 = (-G * circle1.mass * circle2.mass * unit_r)/(double)pow(glm::length(r),2);
-
-    //std::cout << glm::length(r) << std::endl;
-    //std::cout << unit_r.x << unit_r.y << std::endl;
-    //std::cout << "Force applied to circle 2: [" << F21.x << "," << F21.y << "]" << std::endl;
-
-    circle2.gravForce += F21;
-    //circle1.gravForce -= F21;
-}
-
-void GravForceReset(Circle& Circle){
-    Circle.gravForce=glm::vec<2, double>(0);
-    Circle.gravAcceleration=glm::vec<2, double>(0);
-}
-
+void Gravity(Circle& circle1, Circle& circle2, double time);
+void GravForceReset(Circle& Circle);
+void processInput(GLFWwindow *window, double deltaTime);
+void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 
 int main(){
     //initialization
@@ -141,8 +134,9 @@ int main(){
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     //tell glfw we are only using the CORE profile, so we only have the modern functions
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    
 
-    //create window with parameters width, height, name, fullscreen, some bullshit
+    //create window with parameters width, height, name, monitor for fullscreen, some bullshit
     GLFWwindow* window =glfwCreateWindow(windowWidth,windowHeight,"Lorem Ipsum",NULL,NULL);
     //error checking
     if (window == NULL){
@@ -150,9 +144,12 @@ int main(){
         glfwTerminate();
         return -1;
     }
+
     //introduce the window to the current context (make it active)
     glfwMakeContextCurrent(window);
-
+    //set a function that responds to window resize
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    
     gladLoadGL(); //load OpenGL
 
     glViewport(0,0,windowWidth,windowHeight); //tells opengl the area of the window to render in
@@ -161,48 +158,63 @@ int main(){
     Shader shaderProgram("shaders/default.vert","shaders/default.frag"); 
     shaderProgram.Activate();   
 
+
     glm::vec3 red = glm::vec3(1.0f,0.0f,0.0f);
     glm::vec3 green = glm::vec3(0.0f,1.0f,0.0f);
     glm::vec3 blue = glm::vec3(0.0f,0.0f,1.0f);
-    Circle Circles[2] = {Circle(red,shaderProgram), Circle(green,shaderProgram)};
-    //Circle Circles[3] = {Circle(red,shaderProgram), Circle(green,shaderProgram), Circle(blue,shaderProgram)};
-    const static uint nCircles = sizeof(Circles)/sizeof(Circles[0]);
+    //array containing all Circle objects
+    //Circle Circles[2] = {Circle(red,shaderProgram), Circle(green,shaderProgram)};
+    Circle Circles[3] = {Circle(red,shaderProgram), Circle(green,shaderProgram), Circle(blue,shaderProgram)};
+    uint nCircles = sizeof(Circles)/sizeof(Circles[0]);
 
+    //testing
+    //-------------------------------
     Circles[0].positionReal = glm::vec2(0,0);
     Circles[1].positionReal = glm::vec2(1,0);
     Circles[0].mass = solarMass;
-    Circles[1].mass = solarMass*3;
+    Circles[1].mass = earthMass;
     //Circles[0].acceleration.x = 16;
     double V = 2*M_PI; 
     Circles[1].velocity.y = V;
 
-    //Circles[0].velocity.x=3;
-    //Circles[1].velocity.x=3;
+    Circles[0].velocity.x=0;
+    Circles[1].velocity.x=0;
 
-    /*Circles[2].mass = 3;
-    Circles[2].positionReal = glm::vec2(-2,1);
-    Circles[2].velocity.y = -1; 
-    Circles[2].velocity.x = -1;*/  
+    Circles[2].mass = earthMass;
+    Circles[2].positionReal = glm::vec2(-1,0);
+    Circles[2].velocity.y = -V; 
+    Circles[2].velocity.x = 0;  
+    //--------------------------------
     
+    //time related variables
     double lastTime = glfwGetTime();
-    double speed = 3600*24*30;
-    //double speed = 1;
     double totalYears = 0;
+    double now = 0;
+    double dt_sec = 0;
+    double speed_dt_sec = 0;
+    double speed_dt_years = 0;
 
     //main loop (while the window is active)
     while(!glfwWindowShouldClose(window)){
-        glfwGetFramebufferSize(window,&windowWidth,&windowHeight);
-        glViewport((windowWidth-windowHeight)/2,0,windowHeight,windowHeight);
+        //update the viewport based on window dimensions
+        //glfwGetFramebufferSize(window,&windowWidth,&windowHeight);
+        //glViewport((windowWidth-windowHeight)/2,0,windowHeight,windowHeight);
         //set bg color
         glClearColor(0.07f,0.13f,0.17f,1.0f);   
         glClear(GL_COLOR_BUFFER_BIT);
+
         //activate the shader!
         shaderProgram.Activate();
+        processInput(window, dt_sec);
+        glm::mat4 view = glm::lookAt(cameraPos, cameraPos, cameraUp);
+        unsigned int viewLoc = glGetUniformLocation(shaderProgram.ID, "view");
+        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
-        double now = glfwGetTime();
-        double dt_sec = now - lastTime;
-        double speed_dt_sec = dt_sec * speed; 
-        double speed_dt_years = speed_dt_sec / SecondsPerYear;
+        //delta time calculation and adjustment based on speed
+        now = glfwGetTime();
+        dt_sec = now - lastTime;
+        speed_dt_sec = dt_sec * speed; 
+        speed_dt_years = speed_dt_sec / SecondsPerYear;
         totalYears += speed_dt_years; 
         lastTime = now;
 
@@ -252,4 +264,67 @@ int main(){
     glfwDestroyWindow(window);
     glfwTerminate();
     return 0;
+}
+
+//calculates the gravity force
+void Gravity(Circle& circle1, Circle& circle2, double time){
+    glm::vec<2, double> r = circle2.positionReal - circle1.positionReal;
+    glm::vec<2, double> unit_r = r / glm::length(r);
+    glm::vec<2, double> F21 = (-G * circle1.mass * circle2.mass * unit_r)/(double)pow(glm::length(r),2);
+
+    //std::cout << glm::length(r) << std::endl;
+    //std::cout << unit_r.x << unit_r.y << std::endl;
+    //std::cout << "Force applied to circle 2: [" << F21.x << "," << F21.y << "]" << std::endl;
+
+    circle2.gravForce += F21;
+    //circle1.gravForce -= F21;
+}
+
+//resets the gravity force
+void GravForceReset(Circle& Circle){
+    Circle.gravForce=glm::vec<2, double>(0);
+    Circle.gravAcceleration=glm::vec<2, double>(0);
+}
+
+//processes user input such as keys pressed
+void processInput(GLFWwindow *window, double deltaTime)
+{
+    if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, true);
+
+    float cameraSpeed = 2.5 * deltaTime;
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+        cameraPos.y -= cameraSpeed;
+        //std::cout << "n" << std::endl;
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+        cameraPos.y += cameraSpeed;
+        //std::cout << "i" << std::endl;
+    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+        cameraPos.x += cameraSpeed;
+        //std::cout << "g" << std::endl;
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+        cameraPos.x -= cameraSpeed;
+    if (glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS)
+        speed *= 1.01;
+        std::cout << speed << std::endl;
+    if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS)
+        speed /= 1.01;
+        //std::cout << speed << std::endl;
+    if (glfwGetKey(window, GLFW_KEY_EQUAL) == GLFW_PRESS)
+        pixelsPerAU += cameraSpeed*20;
+        std::cout << pixelsPerAU << std::endl;
+    if (glfwGetKey(window, GLFW_KEY_MINUS) == GLFW_PRESS)
+        pixelsPerAU -= cameraSpeed*20;
+        //std::cout << pixelsPerAU << std::endl;
+    
+}
+
+// glfw: whenever the window size changed (by OS or user resize) this callback function executes
+// ---------------------------------------------------------------------------------------------
+void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+{
+    windowWidth = width;
+    windowHeight = height;
+    glViewport((windowWidth-windowHeight)/2,0,windowHeight,windowHeight);
+    //glViewport(0, 0, width, height);
 }
