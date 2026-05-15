@@ -10,8 +10,8 @@ A lightweight 2D Newtonian gravity simulation built with C++17 and OpenGL.
 | Action | Key |
 | :--- | :--- |
 | **Move Camera** | `Arrow Keys` |
-| **Zoom In/Out** | `Z` / `X` |
-| **Simulation Speed** | `+` / `-` |
+| **Zoom In/Out** | `+` / `-` |
+| **Simulation Speed** | `Z` / `X` |
 
 ## Requirements
 - **Compiler:** GCC/G++ min. v9 (with C++17 support)
