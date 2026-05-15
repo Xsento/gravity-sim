@@ -1,4 +1,4 @@
-#include"shaderClass.h"
+#include "shaderClass.h"
 
 // Reads a text file and outputs a string with everything in the text file
 std::string get_file_contents(const char* filename)
@@ -59,16 +59,15 @@ Shader::Shader(const char* vertexFile, const char* fragmentFile)
 
 }
 
+Shader::~Shader()
+{
+	glDeleteProgram(ID);
+}
+
 // Activates the Shader Program
 void Shader::Activate()
 {
 	glUseProgram(ID);
-}
-
-// Deletes the Shader Program
-void Shader::Delete()
-{
-	glDeleteProgram(ID);
 }
 
 // Checks if the different Shaders have compiled properly

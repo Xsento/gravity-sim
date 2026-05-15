@@ -1,0 +1,5 @@
+/home/pwolkowicz/Dokumenty/Projects/C++/gravity-sim cmake transition temp/gravity-sim/build/CMakeFiles/gravity-sim.dir
+/home/pwolkowicz/Dokumenty/Projects/C++/gravity-sim cmake transition temp/gravity-sim/build/CMakeFiles/edit_cache.dir
+/home/pwolkowicz/Dokumenty/Projects/C++/gravity-sim cmake transition temp/gravity-sim/build/CMakeFiles/rebuild_cache.dir
+/home/pwolkowicz/Dokumenty/Projects/C++/gravity-sim cmake transition temp/gravity-sim/build/external/glm/CMakeFiles/edit_cache.dir
+/home/pwolkowicz/Dokumenty/Projects/C++/gravity-sim cmake transition temp/gravity-sim/build/external/glm/CMakeFiles/rebuild_cache.dir

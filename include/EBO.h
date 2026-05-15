@@ -1,7 +1,7 @@
 #ifndef EBO_CLASS_H
 #define EBO_CLASS_H
 
-#include "glad/glad.h"
+#include <glad/glad.h>
 
 class EBO{
     public:
@@ -10,11 +10,11 @@ class EBO{
         //constructor that generates an EBO and links it to indices
         EBO(GLuint* indices, GLsizeiptr size);
 
-        //take a wild fucking guess
+        //binds the EBO
         void Bind();
-        //take a wild fucking guess
+        //unbinds the EBO
         void Unbind();
-        //take a wild fucking guess
+        //deletes the EBO
         void Delete();
 };
 
