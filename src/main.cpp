@@ -141,7 +141,7 @@ int main(){
         std::cout << "--------------------------------" << std::endl;
         std::cout << "Total years passed: " << totalYears << std::endl;
         std::cout << "Speed: " << speed << "x real time" << std::endl;
-        std::cout << "cameraPos: " << cameraPos.x << " " << cameraPos.y << std::endl;
+        std::cout << "Camera Position: " << cameraPos.x << " " << cameraPos.y << std::endl;
         //std::cout << Circles[1].positionReal.x << " " << Circles[1].positionReal.y << std::endl;
 
 
@@ -228,7 +228,7 @@ void processInput(GLFWwindow *window, double deltaTime)
         pixelsPerAU += cameraSpeed*20;
         //std::cout << pixelsPerAU << std::endl;
     if (glfwGetKey(window, GLFW_KEY_MINUS) == GLFW_PRESS)
-        pixelsPerAU -= cameraSpeed*20;
+        if (pixelsPerAU - cameraSpeed*20 > 0) pixelsPerAU -= cameraSpeed*20;
         //std::cout << pixelsPerAU << std::endl;
     
 }
